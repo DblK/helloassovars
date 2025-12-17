@@ -1,0 +1,2 @@
+HELLOASSOVARS_MODULE_TITLE=HelloAsso variables (emails)
+HELLOASSOVARS_MODULE_DESC=Adds __HELLOASSO_PAYMENT_URL__ substitution variable usable in email templates.
