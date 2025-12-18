@@ -1,74 +1,63 @@
 <?php
 /**
- * Complete substitution array for emails/templates.
- *
- * Adds:
- *  - __HELLOASSO_PAYMENT_URL__ : payment URL for invoices (and optionally member subscriptions)
+ * Ajoute des variables de substitution pour les modèles d'emails Dolibarr
+ * Variable ajoutée :
+ *   __HELLOASSO_PAYMENT_URL__  → URL ABSOLUE de paiement en ligne (HelloAsso)
  */
 function helloassovars_completesubstitutionarray(&$substitutionarray, $langs, $object)
 {
-    global $conf;
+    global $conf, $dolibarr_main_url_root;
 
-    if (empty($object) || empty($object->element)) return;
-
-    // Helper: build public newpayment url
-    $buildNewPaymentUrl = function(string $source, string $ref) {
-        $base = dol_buildpath('/public/payment/newpayment.php', 1);
-        return $base.'?source='.urlencode($source).'&ref='.urlencode($ref);
-    };
-
-    // ----- INVOICE -----
-    if ($object->element === 'facture' || $object->element === 'invoice') {
-
-        $url = '';
-
-        // 1) Prefer native helper if available (keeps securekey etc. if Dolibarr adds it)
-        if (method_exists($object, 'getOnlinePaymentUrl')) {
-            // Some Dolibarr versions accept params; we try safest calls.
-            try {
-                $tmp = $object->getOnlinePaymentUrl(1);
-                if (!empty($tmp) && is_string($tmp)) $url = $tmp;
-            } catch (Throwable $e) {
-                // ignore
-            }
-            if (empty($url)) {
-                try {
-                    $tmp = $object->getOnlinePaymentUrl();
-                    if (!empty($tmp) && is_string($tmp)) $url = $tmp;
-                } catch (Throwable $e) {
-                    // ignore
-                }
-            }
-        }
-
-        // 2) Fallback to standard public payment URL
-        if (empty($url) && !empty($object->ref)) {
-            $url = $buildNewPaymentUrl('invoice', $object->ref);
-        }
-
-        $substitutionarray['__HELLOASSO_PAYMENT_URL__'] = $url;
+    // Sécurité
+    if (empty($object) || empty($object->element)) {
+        return;
     }
 
-    // ----- MEMBER SUBSCRIPTION (optional) -----
-    // If you also want it for membership subscriptions, uncomment and adapt:
-    /*
-    if ($object->element === 'subscription' || $object->element === 'membersubscription') {
-
-        $url = '';
-
-        if (method_exists($object, 'getOnlinePaymentUrl')) {
-            try {
-                $tmp = $object->getOnlinePaymentUrl(1);
-                if (!empty($tmp) && is_string($tmp)) $url = $tmp;
-            } catch (Throwable $e) {}
-        }
-
-        // Need a "ref" meaningful for newpayment membersubscription (often member ref)
-        if (empty($url) && !empty($object->ref)) {
-            $url = $buildNewPaymentUrl('membersubscription', $object->ref);
-        }
-
-        $substitutionarray['__HELLOASSO_PAYMENT_URL__'] = $url;
+    // On ne traite que les factures clients
+    if ($object->element !== 'facture' && $object->element !== 'invoice') {
+        return;
     }
-    */
+
+    $paymentUrl = '';
+
+    /**
+     * 1️⃣ Méthode native Dolibarr (si disponible)
+     *    → peut inclure le securekey automatiquement
+     */
+    if (method_exists($object, 'getOnlinePaymentUrl')) {
+        try {
+            $url = $object->getOnlinePaymentUrl(1); // 1 = URL absolue
+            if (!empty($url) && is_string($url)) {
+                $paymentUrl = $url;
+            }
+        } catch (Throwable $e) {
+            // On ignore et on passe au fallback
+        }
+    }
+
+    /**
+     * 2️⃣ Fallback fiable : construction manuelle en URL ABSOLUE
+     *    (fonctionne même derrière Docker / reverse-proxy)
+     */
+    if (empty($paymentUrl) && !empty($object->ref)) {
+
+        // Cas standard : Dolibarr connaît son URL publique
+        if (!empty($dolibarr_main_url_root)) {
+            $paymentUrl =
+                rtrim($dolibarr_main_url_root, '/')
+                . '/public/payment/newpayment.php'
+                . '?source=invoice&ref=' . urlencode($object->ref);
+        }
+        // Dernier recours (ne devrait pas arriver)
+        else {
+            $base = dol_buildpath('/public/payment/newpayment.php', 1);
+            $paymentUrl =
+                $base . '?source=invoice&ref=' . urlencode($object->ref);
+        }
+    }
+
+    /**
+     * 3️⃣ Injection dans les substitutions
+     */
+    $substitutionarray['__HELLOASSO_PAYMENT_URL__'] = $paymentUrl;
 }
