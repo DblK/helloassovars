@@ -23,13 +23,13 @@ class modHelloAssoVars extends DolibarrModules
         $this->rights_class = 'helloassovars';
         $this->family = "other";
         $this->module_position = 500;
+        $this->editor_name = 'DblK';
 
         $this->name = preg_replace('/^mod/i', '', get_class($this));
         $this->description = "Adds substitution variable __HELLOASSO_PAYMENT_URL__ for email templates.";
         $this->version = '1.0.0';
         $this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
-
-        $this->picto = 'bill';
+        $this->picto = 'helloassovars@helloassovars';
 
         // Parts
         $this->module_parts = array(
